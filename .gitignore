@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Ignoriert die rohen Daten beim Pushen
+data/raw/
