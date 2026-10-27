@@ -33,10 +33,10 @@ improved.data |> filter(minute(Zeitstempel) != 0 | second(Zeitstempel) != 0)
 improved.data$SDO_ID |> table() 
 #Berlin-Tempelhof (433) und Leipzig-Holzhausen (2928) haben auffällig weniger Daten
 
-improved.data |> filter(SDO_ID == 2928) |> group_by(year(Zeitstempel)) |> count() |> print(n = Inf)
+#improved.data |> filter(SDO_ID == 2928) |> group_by(year(Zeitstempel)) |> count() |> print(n = Inf)
 #zwischen 1972 und 1997 keine Daten für Leipzig
 
-improved.data |> filter(SDO_ID == 433) |> group_by(year(Zeitstempel)) |> count() |> print(n = Inf)
+#improved.data |> filter(SDO_ID == 433) |> group_by(year(Zeitstempel)) |> count() |> print(n = Inf)
 #zwischen 1971 und 1980 keine Daten für Berlin
 
 all.dates <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
@@ -52,4 +52,5 @@ for (i in seq_along(SDO_IDs)) {
 num.missing <- sapply(missing, length) #Anzahl fehlende MZP zu jew. Station 
 hist(missing$'433', breaks = 70, freq = TRUE) #Histogramm, wo die Daten **fehlen** (SDO_IDs durchgehen missing$'XXX')
 
-
+#Extremwerte
+improved.data |> summary() #müsste für Zeit und Temp passen
