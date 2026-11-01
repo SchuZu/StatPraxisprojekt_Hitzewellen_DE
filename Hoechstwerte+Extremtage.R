@@ -1,3 +1,7 @@
+#ich (eric) habe den code mal überprüft und er scheint richtig zu sein. 
+#jemand sollte ihn aber sicherheitshalber nochmal kontrollieren
+
+
 #mind Messungen pro tag, wert vorerst als platzhalter kann man jederzeit anpassen
 min_messungen <- 20
 
