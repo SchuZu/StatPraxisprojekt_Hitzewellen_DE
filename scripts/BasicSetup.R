@@ -22,33 +22,101 @@ names(SDO_IDs) <- c("Berlin-Tempelhof", "Braunlage", "Bremen", "Essen-Bredeney",
                     "List auf Sylt", "Regensburg", "Rostock-Warnemünde", 
                     "Trier-Petisberg", "Würzburg", "Mannheim")
 
-all.times <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
+times.all <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
                  by = dhours(1))
 
 #Ort als Faktor, NA für fehlende Daten, 'Celsius' statt 'Wert'
-improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(all.times)),
-                                      'Zeit' = rep(all.times, times = length(SDO_IDs))),
+improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(times.all)),
+                                      'Zeit' = rep(times.all, times = length(SDO_IDs))),
                            raw.data |> select(SDO_ID, Zeitstempel, Wert), 
                            by = join_by(Ort.ID == SDO_ID, Zeit == Zeitstempel)) |>
   mutate(Ort.ID = as.factor(Ort.ID)) |>
   rename('Celsius' = Wert)
 
-#Tageshöchstwerte(THW) (fehlende Werte ignoriert, außer ganzer Tag fehlt, dann NA)
+#Tageshöchstwerte(THW)
+missing.max <- 24
 day.max <- improved.data |> 
-  group_by(Ort.ID, 'Tag' = date(Zeit)) |> 
+  group_by(Ort.ID, 'Datum' = date(Zeit)) |> 
   summarise('n.fehlend' = sum(is.na(Celsius)),
-            'Celsius.max' = ifelse(all(is.na(Celsius)), NA, max(Celsius, na.rm = TRUE)))
+            'Celsius.max' = ifelse(sum(is.na(Celsius)) >= missing.max, NA, max(Celsius, na.rm = TRUE)))
 
 #nützlich für genauere Analyse der Stundendaten
 joined <- right_join(day.max,
                      improved.data |> mutate('Tag' = date(Zeit)),
-                     by = join_by(Ort.ID == Ort.ID, Tag == Tag)) |>
+                     by = join_by(Ort.ID == Ort.ID, Datum == Tag)) |>
   mutate(Tag = NULL)
 
 #Schwelle aus Referenzzeitraum bestimmen (1951-1980)
 q <- 0.9 #Quantil
 
-#threshold <- 
-    
+ref.table <- day.max |>
+  filter(Datum < ymd("1981-01-01")) |>
+  group_by(Ort.ID) |>
+  mutate('Ref-10' = lag(Celsius.max, 10),
+         'Ref-9' = lag(Celsius.max, 9),
+         'Ref-8' = lag(Celsius.max, 8),
+         'Ref-7' = lag(Celsius.max, 7),
+         'Ref-6' = lag(Celsius.max, 6),
+         'Ref-5' = lag(Celsius.max, 5),
+         'Ref-4' = lag(Celsius.max, 4),
+         'Ref-3' = lag(Celsius.max, 3),
+         'Ref-2' = lag(Celsius.max, 2),
+         'Ref-1' = lag(Celsius.max, 1),
+         'Ref0' = Celsius.max,
+         'Ref+1' = lead(Celsius.max, 1),
+         'Ref+2' = lead(Celsius.max, 2),
+         'Ref+3' = lead(Celsius.max, 3),
+         'Ref+4' = lead(Celsius.max, 4),
+         'Ref+5' = lead(Celsius.max, 5),
+         'Ref+6' = lead(Celsius.max, 6),
+         'Ref+7' = lead(Celsius.max, 7),
+         'Ref+8' = lead(Celsius.max, 8),
+         'Ref+9' = lead(Celsius.max, 9),
+         'Ref+10' = lead(Celsius.max, 10),
+         Celsius.max = NULL,
+         n.fehlend = NULL) |>
+  ungroup()
+
+q <- 0.9 #Quantil
+threshold <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = 366)),
+                        'Datum' = rep((seq(from = ymd("1972-01-01"), #1972: (fast) arbiträres Schaltjahr
+                                                    to = ymd("1972-12-31"),
+                                                    by = 1)),
+                                          times = length(SDO_IDs)),
+                        'Quantil' = NA,
+                        'n.fehlend' = NA) |>
+  mutate('Monat' = month(Datum),
+         'Tag' = day(Datum))
 
 
+for (j in seq_along(SDO_IDs)) {
+  temp.df <- ref.table |>
+    filter(Ort.ID == SDO_IDs[[j]])
+  for (i in seq_len(366)) {
+    temp.vec <- temp.df |>
+      filter(day(Datum) == day(threshold$Datum[[i]]),
+             month(Datum) == month(threshold$Datum[[i]])) |>
+      select(-c(Ort.ID, Datum)) |>
+      unlist()
+    threshold$Quantil[[i + 366 * (j - 1)]] <- quantile(temp.vec, 
+                                                       probs = q, 
+                                                       na.rm = TRUE)
+    threshold$n.fehlend[[i + 366 * (j - 1)]] <- sum(is.na(temp.vec))
+  }
+  print(names(SDO_IDs)[[j]])
+}
+#umständlich aber kürzere Rechenzeit
+
+#Ist THW > q-Quantil
+day.max.final <- left_join(day.max |> 
+                       mutate('Monat' = month(Datum),
+                              'Tag' = day(Datum)),
+                     threshold |> 
+                       select(-c(n.fehlend, Datum)),
+                     by = join_by(Ort.ID == Ort.ID,
+                                  Tag == Tag,
+                                  Monat == Monat),
+                     keep = FALSE) |>
+  select(-c(Tag, Monat)) |>
+  mutate('Extrem' = Celsius.max > Quantil) |>
+  ungroup()

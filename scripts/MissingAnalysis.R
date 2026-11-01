@@ -1,4 +1,4 @@
-source ("scripts/BasicSetup.R")
+source ("scripts/BasicSetup.R") #eher ungut
 
 #(***): ausgenommen Werte, an denen der ganze Tag fehlt
 message (paste("Es fehlen", improved.data |> filter(is.na(Celsius)) |> nrow(), "Stundenwerte\n"))
@@ -31,6 +31,11 @@ joined |>
   filter(is.na(Celsius), !is.na(Celsius.max)) |>
   count(Ort.ID, date(Zeit)) |>
   ggplot(aes(x = n, y = Ort.ID)) + geom_boxplot()
+
+#Schalttag?
+threshold  |> ggplot(aes(Datum, Quantil, colour = Ort.ID)) + geom_line()
+
+
 
 
 
