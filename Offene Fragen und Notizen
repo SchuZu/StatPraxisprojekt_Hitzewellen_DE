@@ -1,0 +1,9 @@
+uhrzeit: UTC als uhrzeit in rohdaten. zeitumstellung wird meines wissen nicht berücksichtigt. 
+bleiben wir auf UTC oder wechsel auf MEZ? 
+
+
+extremtage: wie genau zählen wir die extremtage/hitzewellen für deutschland (frage 1). 
+wie ist bei den Stationen wo mehrere jahre fehlen?
+
+
+R paket zu unserem thema: https://github.com/robwschlegel/heatwaveR/tree/master
