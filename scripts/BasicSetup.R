@@ -10,7 +10,6 @@ library(ggplot2)
 
 #Zeile 1 bis 8 mit pacman-package machen...
 
-#(***): ausgenommen Werte, an denen der ganze Tag fehlt
 
 #import data
 raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
@@ -23,12 +22,12 @@ names(SDO_IDs) <- c("Berlin-Tempelhof", "Braunlage", "Bremen", "Essen-Bredeney",
                     "List auf Sylt", "Regensburg", "Rostock-Warnemünde", 
                     "Trier-Petisberg", "Würzburg", "Mannheim")
 
-all.dates <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
+all.times <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
                  by = dhours(1))
 
 #Ort als Faktor, NA für fehlende Daten, 'Celsius' statt 'Wert'
-improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(all.dates)),
-                                      'Zeit' = rep(all.dates, times = length(SDO_IDs))),
+improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(all.times)),
+                                      'Zeit' = rep(all.times, times = length(SDO_IDs))),
                            raw.data |> select(SDO_ID, Zeitstempel, Wert), 
                            by = join_by(Ort.ID == SDO_ID, Zeit == Zeitstempel)) |>
   mutate(Ort.ID = as.factor(Ort.ID)) |>
@@ -36,47 +35,20 @@ improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(all.
 
 #Tageshöchstwerte(THW) (fehlende Werte ignoriert, außer ganzer Tag fehlt, dann NA)
 day.max <- improved.data |> 
-  group_by(Ort.ID, date(Zeit)) |> 
-  summarise('no.missing' = ifelse(any(is.na(Celsius)), FALSE, TRUE),
-            'Celsius.max' = ifelse(all(is.na(Celsius)), NA, max(Celsius, na.rm = TRUE))) |>
-  rename('Tag' = 'date(Zeit)')
+  group_by(Ort.ID, 'Tag' = date(Zeit)) |> 
+  summarise('n.fehlend' = sum(is.na(Celsius)),
+            'Celsius.max' = ifelse(all(is.na(Celsius)), NA, max(Celsius, na.rm = TRUE)))
 
+#nützlich für genauere Analyse der Stundendaten
 joined <- right_join(day.max,
                      improved.data |> mutate('Tag' = date(Zeit)),
                      by = join_by(Ort.ID == Ort.ID, Tag == Tag)) |>
   mutate(Tag = NULL)
 
+#Schwelle aus Referenzzeitraum bestimmen (1951-1980)
+q <- 0.9 #Quantil
 
-#Uhrzeit vs. #THW
-joined |>
-  filter(no.missing, Celsius.max == Celsius) |>
-  pull(Zeit) |> hour() |> hist()
-
-#Uhrzeit vs. #fehlende Werte (***)
-joined |> 
-  filter(!is.na(Celsius.max), is.na(Celsius)) |>
-  pull(Zeit) |> hour() |> hist()
-
-#Anzahl Tage/Stunden mit mind. einem fehlenden Wert (***)
-joined |> 
-  filter(!is.na(Celsius.max), is.na(Celsius)) |>
-  group_by(Ort.ID) |>
-  summarise('Anzahl.Tage' = length(unique(date(Zeit))),
-            'Anzahl.Stunde' = n())
-
-#Anzahl Tage mit bestätigtem THW
-day.max |>
-  filter(no.missing) |>
-  count(Ort.ID)
-
-#Anzahl NAs, falls THW vorhanden
-joined |>
-  filter(is.na(Celsius), !is.na(Celsius.max)) |>
-  count(Ort.ID, date(Zeit)) |>
-  ggplot(aes(x = n, y = Ort.ID)) + geom_boxplot()
+#threshold <- 
+    
 
 
-
-
-cat(paste("Es fehlen", improved.data |> filter(is.na(Celsius)) |> nrow(), "Stundenwerte\n"))
-cat(paste("Es fehlen", day.max |> filter(is.na(Celsius.max)) |> nrow(), "Tageshöchstwerte\n"))
