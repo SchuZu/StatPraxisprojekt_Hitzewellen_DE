@@ -27,7 +27,6 @@ hoechstwert <- daten %>%
 # Platzhalter, jederzeit anpassbar
 min_referenztage <- 15
 
-# Daten vorbereiten
 daten_extrem <- hoechstwert %>%
   select(-any_of(c(
     "Kalendertag", "Quantil_90",
@@ -64,7 +63,7 @@ kalendertage <- format(
 #Schwellenwerte Liste
 schwellen_liste <- vector("list", length(kalendertage))
 
-# 0,9 Quantil berechnen die alle Tage 
+# 0,9 Quantil berechnen für alle Tage 
 for (i in seq_along(kalendertage)) {
   
   tag <- kalendertage[i]
@@ -77,7 +76,6 @@ for (i in seq_along(kalendertage)) {
   
   # wegen sch... schaltjahren
   mitte <- mitte[!is.na(mitte)]
-  
   # 10 Tage davor und danach
   fenster <- data.frame(
     Jahr = rep(year(mitte), each = 21),
