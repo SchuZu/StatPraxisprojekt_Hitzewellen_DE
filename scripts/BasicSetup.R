@@ -22,6 +22,7 @@ names(SDO_IDs) <- c("Berlin-Tempelhof", "Braunlage", "Bremen", "Essen-Bredeney",
                     "List auf Sylt", "Regensburg", "Rostock-Warnemünde", 
                     "Trier-Petisberg", "Würzburg", "Mannheim")
 
+#alle Zeitpunkte, für die Daten erhoben werden sollen
 times.all <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
                  by = dhours(1))
 
@@ -40,15 +41,29 @@ day.max <- improved.data |>
   summarise('n.fehlend' = sum(is.na(Celsius)),
             'Celsius.max' = ifelse(sum(is.na(Celsius)) >= missing.max, NA, max(Celsius, na.rm = TRUE)))
 
+#Möglichkeit, Schaltjahre zu verbannen
+leap.year <- TRUE
+if (leap.year) {
+  year.length <- 366
+  year <- 1972 #(fast) arbiträres Schaltjahr
+} else {
+  year.length <- 365
+  year <- 1973
+  day.max <- day.max |> 
+    filter(!(day(Datum) == 29 & month(Datum) == 2))
+}
+
 #nützlich für genauere Analyse der Stundendaten
 joined <- right_join(day.max,
                      improved.data |> mutate('Tag' = date(Zeit)),
                      by = join_by(Ort.ID == Ort.ID, Datum == Tag)) |>
   mutate(Tag = NULL)
 
-#Schwelle aus Referenzzeitraum bestimmen (1951-1980)
+#Schwelle aus Referenzzeitraum (RZR) bestimmen (1951-1980)
 q <- 0.9 #Quantil
 
+#für RZR Data.Frame erstellen; eine Zeile enthät für Ort und Datum alle 
+#Temperaturen der drei Wochen, die für die Quantilberechnung nötig sind
 ref.table <- day.max |>
   filter(Datum < ymd("1981-01-01")) |>
   group_by(Ort.ID) |>
@@ -78,32 +93,35 @@ ref.table <- day.max |>
   ungroup()
 
 q <- 0.9 #Quantil
-threshold <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = 366)),
-                        'Datum' = rep((seq(from = ymd("1972-01-01"), #1972: (fast) arbiträres Schaltjahr
-                                                    to = ymd("1972-12-31"),
-                                                    by = 1)),
-                                          times = length(SDO_IDs)),
-                        'Quantil' = NA,
-                        'n.fehlend' = NA) |>
+
+#Kalendertage für Schwellen für jeden Ort
+threshold <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = year.length)), 
+                    'Datum' = rep(seq(from = ymd(paste0(year, "-01-01")), 
+                                       to = ymd(paste0(year, "-12-31")),
+                                       by = 1),
+                                  times = length(SDO_IDs)),
+                    'Quantil' = NA,
+                    'n.fehlend' = NA) |>
   mutate('Monat' = month(Datum),
          'Tag' = day(Datum))
 
 
-for (j in seq_along(SDO_IDs)) {
+for (j in seq_along(SDO_IDs)) { #pro Ort
   temp.df <- ref.table |>
-    filter(Ort.ID == SDO_IDs[[j]])
-  for (i in seq_len(366)) {
+    filter(Ort.ID == SDO_IDs[[j]]) #Einteilen in kleinere Data.Frames (spart Zeit)
+  for (i in seq_len(year.length)) { #pro Tag
     temp.vec <- temp.df |>
       filter(day(Datum) == day(threshold$Datum[[i]]),
-             month(Datum) == month(threshold$Datum[[i]])) |>
-      select(-c(Ort.ID, Datum)) |>
-      unlist()
-    threshold$Quantil[[i + 366 * (j - 1)]] <- quantile(temp.vec, 
+             month(Datum) == month(threshold$Datum[[i]])) |> #suche Tag i
+      select(-c(Ort.ID, Datum)) |> #nur Temperaturen übrig
+      unlist() #als Vektor statt Data.Frame
+    threshold$Quantil[[i + year.length * (j - 1)]] <- quantile(temp.vec, 
                                                        probs = q, 
-                                                       na.rm = TRUE)
-    threshold$n.fehlend[[i + 366 * (j - 1)]] <- sum(is.na(temp.vec))
+                                                       na.rm = TRUE) #Quantil berechnen
+    threshold$n.fehlend[[i + year.length * (j - 1)]] <- sum(is.na(temp.vec)) #Anzahl fehlend von 630 (168 im Schaltjahr)
   }
-  print(names(SDO_IDs)[[j]])
+  rm(temp.vec, temp.df) #Hilfsobjekte löschen
+  print(names(SDO_IDs)[[j]]) #Rechenzeit abschätzen
 }
 #umständlich aber kürzere Rechenzeit
 
@@ -116,7 +134,27 @@ day.max.final <- left_join(day.max |>
                      by = join_by(Ort.ID == Ort.ID,
                                   Tag == Tag,
                                   Monat == Monat),
-                     keep = FALSE) |>
+                     keep = FALSE) |> #join day.max und threshold,
   select(-c(Tag, Monat)) |>
-  mutate('Extrem' = Celsius.max > Quantil) |>
+  mutate('Extrem' = Celsius.max > Quantil) |> #um das zu testen
   ungroup()
+
+#Hitzewellen
+day.max.analysis <- day.max.final |>
+  filter(Datum >= ymd("1981-01-01")) |> #im Analysezeitraum
+  mutate('Ext-2' = lag(Extrem, 2),
+         'Ext-1' = lag(Extrem, 1),
+         'Ext+1' = lead(Extrem, 1),
+         'Ext+2' = lead(Extrem, 2)) |> 
+  mutate('Hitzewelle' = Extrem & ( #damit Hitzewelle, muss an diesem Tag Extremtag sein und
+                        (`Ext-2` & `Ext-1`) | #(entweder an den zwei vorherigen
+                        (`Ext-1` & `Ext+1`) | #oder am Tag davor und danach
+                        (`Ext+1` & `Ext+2`))) |> #oder an den zwei nachfolgenden) 
+  mutate('Beginn.Hw' = Hitzewelle & !`Ext-1`, #an diesem Tag Hitzewelle, am vorherigen nicht
+         'Ext-2' = NULL,
+         'Ext-1' = NULL,
+         'Ext+1' = NULL,
+         'Ext+2' = NULL) #aufräumen
+
+heat.waves <- NULL #falls jemand möchte, gerne
+  
