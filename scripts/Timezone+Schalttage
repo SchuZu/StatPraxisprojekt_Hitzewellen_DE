@@ -1,0 +1,12 @@
+#anwenden vor dem Skript mit den Hoechstwerten
+
+tz(daten$MESSZEIT)
+
+#timezone ändern
+daten$Zeitstempel <- with_tz(daten$Zeitstempel, "Europe/Berlin")
+
+tz(daten$Zeitstempel)
+
+#schalttage entfernen
+#daten <- daten %>% 
+  #filter(!(month(Zeitstempel) == 2 & day(Zeitstempel) == 29))
