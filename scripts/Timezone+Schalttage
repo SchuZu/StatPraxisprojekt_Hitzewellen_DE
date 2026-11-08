@@ -1,6 +1,6 @@
 #anwenden vor dem Skript mit den Hoechstwerten
 
-tz(daten$MESSZEIT)
+tz(daten$Zeitstempel)
 
 #timezone ändern
 daten$Zeitstempel <- with_tz(daten$Zeitstempel, "Europe/Berlin")
