@@ -150,7 +150,7 @@ day.max.analysis <- day.max.final |>
                         (`Ext-2` & `Ext-1`) | #(entweder an den zwei vorherigen
                         (`Ext-1` & `Ext+1`) | #oder am Tag davor und danach
                         (`Ext+1` & `Ext+2`))) |> #oder an den zwei nachfolgenden) 
-  mutate('Beginn.Hw' = Hitzewelle & !`Ext-1`, #an diesem Tag Hitzewelle, am vorherigen nicht
+  mutate('Beginn.Hw' = Hitzewelle & (!`Ext-1` | is.na(`Ext-1`)), #an diesem Tag Hitzewelle, am vorherigen nicht
          'Ext-2' = NULL,
          'Ext-1' = NULL,
          'Ext+1' = NULL,
@@ -161,15 +161,15 @@ heat.waves <- day.max.analysis |>
   mutate(
     #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
-    hw_id = cumsum( 
-      Beginn.hw, TRUE
-    )
-  ) |>
+    hw_id = cumsum(Beginn.Hw)) |>
   group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
-  summarise(
+  reframe(
     Beginn = min(Datum), 
     Ende = max(Datum),
     Dauer = n(),
-    .groups = "drop" #hebt die Gruppierung wieder auf
-  )
-  
+    Ort.ID = Ort.ID) |>
+  unique()
+
+ref.mean #<- Mittelwerte der Höchsttemp. im RZR
+intensity.m #<- mittl. Intensität (siehe Projektbeschr.)
+intensity.c #<- kum. Intensität

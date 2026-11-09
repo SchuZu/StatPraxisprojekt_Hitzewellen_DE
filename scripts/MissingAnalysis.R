@@ -1,4 +1,4 @@
-source ("scripts/BasicSetup.R") #eher ungut
+#source ("scripts/BasicSetup.R") #eher ungut
 
 #(***): ausgenommen Werte, an denen der ganze Tag fehlt
 message (paste("Es fehlen", improved.data |> filter(is.na(Celsius)) |> nrow(), "Stundenwerte\n"))
