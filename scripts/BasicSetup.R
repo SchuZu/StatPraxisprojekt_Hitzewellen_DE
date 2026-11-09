@@ -14,13 +14,17 @@ library(ggplot2)
 #import data
 raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
 
-#Namen den SDO_IDs zuordnen (sonst unbenutzt, aber für später erledigt)
+
 SDO_IDs <- raw.data$SDO_ID |> unique() |> sort()
+#bundesdeutsches Mittel
+SDO_IDs <- c(SDO_IDs, 9999)
+
+#Namen den SDO_IDs zuordnen (sonst unbenutzt, aber für später erledigt)
 names(SDO_IDs) <- c("Berlin-Tempelhof", "Braunlage", "Bremen", "Essen-Bredeney", 
                     "Freiburg", "Freudenstadt", "Gardelegen",
                     "Garmisch-Partenkirchen", "Leipzig Holzhausen", "Lindenberg",
                     "List auf Sylt", "Regensburg", "Rostock-Warnemünde", 
-                    "Trier-Petisberg", "Würzburg", "Mannheim")
+                    "Trier-Petisberg", "Würzburg", "Mannheim", "Deutschland-Avg")
 
 #alle Zeitpunkte, für die Daten erhoben werden sollen
 times.all <- seq(ymd_hms("1951-01-01 00:00:00"), ymd_hms("2026-01-01 23:00:00"),
@@ -40,6 +44,14 @@ day.max <- improved.data |>
   group_by(Ort.ID, 'Datum' = date(Zeit)) |> 
   summarise('n.fehlend' = sum(is.na(Celsius)),
             'Celsius.max' = ifelse(sum(is.na(Celsius)) >= missing.max, NA, max(Celsius, na.rm = TRUE)))
+
+#Deutsche Mittelwerte
+ger.mean <- day.max |>
+  group_by(Datum) |>
+  summarise('Ort.ID' = as.factor(9999),
+            'Celsius.max' = round(mean(Celsius.max, na.rm = TRUE), 1), #Mittelwerte der THW
+            'n.fehlend' = sum(is.na(Celsius.max))) #hier Anzahl der fehlenden Stationen
+day.max <- rbind(day.max, ger.mean)
 
 #Möglichkeit, Schaltjahre zu verbannen
 leap.year <- TRUE
@@ -158,16 +170,15 @@ day.max.analysis <- day.max.final |>
 
 heat.waves <- day.max.analysis |> 
   filter(Hitzewelle) |> #ist Teil einer Hitzewelle
-  mutate(
+  mutate('hw_id' = cumsum(Beginn.Hw)) |>
     #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
-    hw_id = cumsum(Beginn.Hw)) |>
   group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
   reframe(
-    Beginn = min(Datum), 
-    Ende = max(Datum),
-    Dauer = n(),
-    Ort.ID = Ort.ID) |>
+    'Beginn' = min(Datum), 
+    'Ende' = max(Datum),
+    'Dauer' = n(),
+    'Ort.ID' = Ort.ID) |>
   unique()
 
 ref.mean #<- Mittelwerte der Höchsttemp. im RZR
