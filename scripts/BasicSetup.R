@@ -159,10 +159,10 @@ day.max.analysis <- day.max.final |>
 heat.waves <- day.max.analysis |> 
   filter(Hitzewelle) |> #ist Teil einer Hitzewelle
   mutate(
-    #erzeugt id für jede zusammenhängende Hitzewelle
+    #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
     hw_id = cumsum( 
-      Beginn.hw
+      Beginn.hw, TRUE
     )
   ) |>
   group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
