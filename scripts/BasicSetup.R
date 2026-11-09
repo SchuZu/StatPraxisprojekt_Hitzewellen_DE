@@ -36,22 +36,25 @@ improved.data <- left_join(data.frame('Ort.ID' = rep(SDO_IDs, each = length(time
                            raw.data |> select(SDO_ID, Zeitstempel, Wert), 
                            by = join_by(Ort.ID == SDO_ID, Zeit == Zeitstempel)) |>
   mutate(Ort.ID = as.factor(Ort.ID)) |>
-  rename('Celsius' = Wert)
+  rename('Celsius' = Wert) |>
+  filter(Ort.ID != 9999)
 
 #Tageshöchstwerte(THW)
 missing.max <- 24
 day.max <- improved.data |> 
   group_by(Ort.ID, 'Datum' = date(Zeit)) |> 
   summarise('n.fehlend' = sum(is.na(Celsius)),
-            'Celsius.max' = ifelse(sum(is.na(Celsius)) >= missing.max, NA, max(Celsius, na.rm = TRUE)))
+            'Celsius.max' = ifelse(sum(is.na(Celsius)) >= missing.max, NA, max(Celsius, na.rm = TRUE))) |>
+  ungroup()
 
 #Deutsche Mittelwerte
 ger.mean <- day.max |>
   group_by(Datum) |>
   summarise('Ort.ID' = as.factor(9999),
             'Celsius.max' = round(mean(Celsius.max, na.rm = TRUE), 1), #Mittelwerte der THW
-            'n.fehlend' = sum(is.na(Celsius.max))) #hier Anzahl der fehlenden Stationen
-day.max <- rbind(day.max, ger.mean)
+            'n.fehlend' = sum(is.na(Celsius.max))) #|> #hier Anzahl der fehlenden Stationen
+  #select(c("Ort.ID", "Datum", "n.fehlend", "Celsius.max"))
+day.max <- bind_rows(day.max, ger.mean)
 
 #Möglichkeit, Schaltjahre zu verbannen
 leap.year <- TRUE
@@ -174,13 +177,38 @@ heat.waves <- day.max.analysis |>
     #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
   group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
-  reframe(
-    'Beginn' = min(Datum), 
-    'Ende' = max(Datum),
-    'Dauer' = n(),
-    'Ort.ID' = Ort.ID) |>
+  reframe('Beginn' = min(Datum), 
+          'Ende' = max(Datum),
+          'Dauer' = n(),
+          'Ort.ID' = Ort.ID) |>
   unique()
 
-ref.mean #<- Mittelwerte der Höchsttemp. im RZR
+#Mittelwerte der Höchsttemp. im RZR (Fenster von 3 Tagen)
+ref.mean <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = year.length)), 
+                   'Datum' = rep(seq(from = ymd(paste0(year, "-01-01")), 
+                                     to = ymd(paste0(year, "-12-31")),
+                                     by = 1),
+                                 times = length(SDO_IDs)),
+                   'Durchschnitt' = NA,
+                   'n.fehlend' = NA) |>
+  mutate('Monat' = month(Datum),
+         'Tag' = day(Datum))
+for (j in seq_along(SDO_IDs)) { #pro Ort
+  temp.df <- ref.table |>
+    filter(Ort.ID == SDO_IDs[[j]]) #Einteilen in kleinere Data.Frames (spart Zeit)
+  for (i in seq_len(year.length)) { #pro Tag
+    temp.vec <- temp.df |>
+      filter(day(Datum) == day(threshold$Datum[[i]]),
+             month(Datum) == month(threshold$Datum[[i]])) |> #suche Tag i
+      select(c(`Ref-1`, Ref0, `Ref+1`)) |> #Fenster für stabileren Mittelwert
+      unlist() #als Vektor statt Data.Frame
+    ref.mean$Durchschnitt[[i + year.length * (j - 1)]] <- mean(temp.vec,
+                                                               na.rm = TRUE) #Mittelwert berechnen
+    ref.mean$n.fehlend[[i + year.length * (j - 1)]] <- sum(is.na(temp.vec)) #Anzahl fehlend von 90 (23 im Schaltjahr)
+  }
+  rm(temp.vec, temp.df) #Hilfsobjekte löschen
+  print(names(SDO_IDs)[[j]]) #Rechenzeit abschätzen
+}
+
 intensity.m #<- mittl. Intensität (siehe Projektbeschr.)
 intensity.c #<- kum. Intensität
