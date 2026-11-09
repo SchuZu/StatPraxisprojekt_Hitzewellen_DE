@@ -156,5 +156,20 @@ day.max.analysis <- day.max.final |>
          'Ext+1' = NULL,
          'Ext+2' = NULL) #aufräumen
 
-heat.waves <- NULL #falls jemand möchte, gerne
+heat.waves <- day.max.analysis |> 
+  filter(Hitzewelle) |> #ist Teil einer Hitzewelle
+  mutate(
+    #erzeugt id für jede zusammenhängende Hitzewelle
+    #zählt bei jedem Beginn einer neuen Hitzewelle hoch
+    hw_id = cumsum( 
+      Beginn.hw
+    )
+  ) |>
+  group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
+  summarise(
+    Beginn = min(Datum), 
+    Ende = max(Datum),
+    Dauer = n(),
+    .groups = "drop" #hebt die Gruppierung wieder auf
+  )
   
