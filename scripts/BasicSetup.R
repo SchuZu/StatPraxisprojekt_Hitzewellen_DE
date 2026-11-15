@@ -120,6 +120,16 @@ threshold <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = year.length)),
   mutate('Monat' = month(Datum),
          'Tag' = day(Datum))
 
+#Mittelwerte der Höchsttemp. im RZR (Fenster von 3 Tagen)
+ref.mean <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = year.length)), 
+                   'Datum' = rep(seq(from = ymd(paste0(year, "-01-01")), 
+                                     to = ymd(paste0(year, "-12-31")),
+                                     by = 1),
+                                 times = length(SDO_IDs)),
+                   'Durchschnitt' = NA) |>
+  mutate('Monat' = month(Datum),
+         'Tag' = day(Datum))
+
 
 for (j in seq_along(SDO_IDs)) { #pro Ort
   temp.df <- ref.table |>
@@ -134,6 +144,14 @@ for (j in seq_along(SDO_IDs)) { #pro Ort
                                                        probs = q, 
                                                        na.rm = TRUE) #Quantil berechnen
     threshold$n.fehlend[[i + year.length * (j - 1)]] <- sum(is.na(temp.vec)) #Anzahl fehlend von 630 (168 im Schaltjahr)
+    
+    temp.vec <- temp.df |>
+      filter(day(Datum) == day(threshold$Datum[[i]]),
+             month(Datum) == month(threshold$Datum[[i]])) |> #suche Tag i
+      select(c(`Ref-1`, Ref0, `Ref+1`)) |> #Fenster für stabileren Mittelwert
+      unlist() #als Vektor statt Data.Frame
+    ref.mean$Durchschnitt[[i + year.length * (j - 1)]] <- mean(temp.vec,
+                                                               na.rm = TRUE) #Mittelwert berechnen
   }
   rm(temp.vec, temp.df) #Hilfsobjekte löschen
   print(names(SDO_IDs)[[j]]) #Rechenzeit abschätzen
@@ -183,32 +201,6 @@ heat.waves <- day.max.analysis |>
           'Ort.ID' = Ort.ID) |>
   unique()
 
-#Mittelwerte der Höchsttemp. im RZR (Fenster von 3 Tagen)
-ref.mean <- tibble('Ort.ID' = as.factor(rep(SDO_IDs, each = year.length)), 
-                   'Datum' = rep(seq(from = ymd(paste0(year, "-01-01")), 
-                                     to = ymd(paste0(year, "-12-31")),
-                                     by = 1),
-                                 times = length(SDO_IDs)),
-                   'Durchschnitt' = NA,
-                   'n.fehlend' = NA) |>
-  mutate('Monat' = month(Datum),
-         'Tag' = day(Datum))
-for (j in seq_along(SDO_IDs)) { #pro Ort
-  temp.df <- ref.table |>
-    filter(Ort.ID == SDO_IDs[[j]]) #Einteilen in kleinere Data.Frames (spart Zeit)
-  for (i in seq_len(year.length)) { #pro Tag
-    temp.vec <- temp.df |>
-      filter(day(Datum) == day(threshold$Datum[[i]]),
-             month(Datum) == month(threshold$Datum[[i]])) |> #suche Tag i
-      select(c(`Ref-1`, Ref0, `Ref+1`)) |> #Fenster für stabileren Mittelwert
-      unlist() #als Vektor statt Data.Frame
-    ref.mean$Durchschnitt[[i + year.length * (j - 1)]] <- mean(temp.vec,
-                                                               na.rm = TRUE) #Mittelwert berechnen
-    ref.mean$n.fehlend[[i + year.length * (j - 1)]] <- sum(is.na(temp.vec)) #Anzahl fehlend von 90 (23 im Schaltjahr)
-  }
-  rm(temp.vec, temp.df) #Hilfsobjekte löschen
-  print(names(SDO_IDs)[[j]]) #Rechenzeit abschätzen
-}
-
 intensity.m #<- mittl. Intensität (siehe Projektbeschr.)
 intensity.c #<- kum. Intensität
+  
