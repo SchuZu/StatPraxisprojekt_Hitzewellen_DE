@@ -12,7 +12,7 @@ library(ggplot2)
 
 
 #import data
-raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
+#raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
 
 
 SDO_IDs <- raw.data$SDO_ID |> unique() |> sort()
@@ -175,6 +175,7 @@ day.max.final <- left_join(day.max |>
 #Hitzewellen
 day.max.analysis <- day.max.final |>
   filter(Datum >= ymd("1981-01-01")) |> #im Analysezeitraum
+  group_by(Ort.ID) |> 
   mutate('Ext-2' = lag(Extrem, 2),
          'Ext-1' = lag(Extrem, 1),
          'Ext+1' = lead(Extrem, 1),
@@ -194,13 +195,44 @@ heat.waves <- day.max.analysis |>
   mutate('hw_id' = cumsum(Beginn.Hw)) |>
     #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
-  group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
+  group_by(Ort.ID, hw_id) |>  #gruppiert die Hitzewellen und fasst sie zusammen
   reframe('Beginn' = min(Datum), 
           'Ende' = max(Datum),
           'Dauer' = n(),
           'Ort.ID' = Ort.ID) |>
   unique()
 
-intensity.m #<- mittl. Intensität (siehe Projektbeschr.)
-intensity.c #<- kum. Intensität
+#<- mittl. Intensität (siehe Projektbeschr.)
+intensity.m <- day.max.analysis |> 
+  filter(Hitzewelle) |> #Tage innerhalb Hitzewelle
+  mutate('hw_id' = cumsum(Beginn.Hw),
+         'Monat' = month(Datum),
+         'Tag' = day(Datum)) |>
+  left_join(ref.mean |> select(Ort.ID, Monat, Tag, Durchschnitt),
+            by = join_by(Ort.ID, Monat, Tag)) |> #Mittelwerte von referenzzeitraum zuordnen
+  group_by(Ort.ID, hw_id) |> #für jede Hitzewelle
+  summarise('Beginn' = min(Datum),
+            'Ende' = max(Datum),
+            'Dauer' = n(),
+            'Intensität.m' = mean(Celsius.max - Durchschnitt, na.rm = TRUE)) |> 
+  ungroup() #gruppierung aufheben
+
+#<- kum. Intensität
+intensity.c <- tibble()
+
+for (j in seq(1981, 2025)) { #für jedes Jahr
+  temp.df <- day.max.analysis |>
+    filter(Hitzewelle,
+           Datum >= ymd(paste0(j, "-01-01")),
+           Datum < ymd(paste0(j + 1, "-01-01"))) |> #Hitzewellentage des Jahres
+    mutate('Monat' = month(Datum),
+           'Tag' = day(Datum)) |>
+    left_join(ref.mean |> select(Ort.ID, Monat, Tag, Durchschnitt),
+              by = join_by(Ort.ID, Monat, Tag)) |> #Referenzmittelwerte zuordnen
+    group_by(Ort.ID) |> #für jede Station
+    summarise('Jahr' = j,
+              'Intensität.c' = sum(Celsius.max - Durchschnitt, na.rm = TRUE)) |>
+    ungroup() #Gruppierung aufheben
   
+  intensity.c <- bind_rows(intensity.c, temp.df)
+}  
