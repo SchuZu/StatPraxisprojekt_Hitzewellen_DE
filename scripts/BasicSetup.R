@@ -191,16 +191,29 @@ day.max.analysis <- day.max.final |>
 
 heat.waves <- day.max.analysis |> 
   filter(Hitzewelle) |> #ist Teil einer Hitzewelle
+  #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
+  #zählt bei jedem Beginn einer neuen Hitzewelle hoch
   mutate('hw_id' = cumsum(Beginn.Hw)) |>
-    #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
-    #zählt bei jedem Beginn einer neuen Hitzewelle hoch
   group_by(hw_id) |> #gruppiert die Hitzewellen und fasst sie zusammen
   reframe('Beginn' = min(Datum), 
           'Ende' = max(Datum),
           'Dauer' = n(),
           'Ort.ID' = Ort.ID) |>
-  unique()
+  unique() 
 
-intensity.m #<- mittl. Intensität (siehe Projektbeschr.)
-intensity.c #<- kum. Intensität
+#fügt heat.waves Spalte mit Durchschnittstemperatur der jeweiligen Hitzewelle hinzu
+#NA ist ausgeschlossen, da Teil einer Hitzewelle
+mutate(heat.waves, 'Mid.Intensity' = 0)
+for (i in seq_along(heat.waves$hw.id)) { #pro heatwave
+  #pro Tag in der heatwave
+  for (j in seq(from = heat.waves$Beginn[[i]], to = heat.waves$Ende[[i]], by = 1) {
+    #Temp - ref.mean Temp, kein Absolutbetrag, da auch negative Werte relevant sind
+    heat.waves$Mid.Intensity[[i]] <- heat.waves$Mid.Intensity[[i]] + 
+      filter(day.max.analysis, Ort.ID == heat.waves$Ort.ID[[i]], 
+             Datum == j)$Celsius.max -
+      filter(ref.mean, Ort.ID == heat.waves$Ort.ID[[i]], 
+             Datum == j)$Durchschnitt
+  }
+}
+
   
