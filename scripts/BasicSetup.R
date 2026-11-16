@@ -71,7 +71,7 @@ if (leap.year) {
 #nützlich für genauere Analyse der Stundendaten
 joined <- right_join(day.max,
                      improved.data |> mutate('Tag' = date(Zeit)),
-                     by = join_by(Ort.ID == Ort.ID, Datum == Tag)) |>
+                     by = join_by(Ort.ID, Datum == Tag)) |>
   mutate(Tag = NULL)
 
 #Schwelle aus Referenzzeitraum (RZR) bestimmen (1951-1980)
@@ -164,9 +164,7 @@ day.max.final <- left_join(day.max |>
                               'Tag' = day(Datum)),
                      threshold |> 
                        select(-c(n.fehlend, Datum)),
-                     by = join_by(Ort.ID == Ort.ID,
-                                  Tag == Tag,
-                                  Monat == Monat),
+                     by = join_by(Ort.ID, Tag, Monat),
                      keep = FALSE) |> #join day.max und threshold,
   select(-c(Tag, Monat)) |>
   mutate('Extrem' = Celsius.max > Quantil) |> #um das zu testen
@@ -193,7 +191,7 @@ day.max.analysis <- day.max.final |>
 heat.waves <- day.max.analysis |> 
   filter(Hitzewelle) |> #ist Teil einer Hitzewelle
   mutate('hw_id' = cumsum(Beginn.Hw)) |>
-    #fügt Hitzetagen eine id für die jeweilige Hitzewelle hinzu
+    #fügt Hitzetagen eine id (nicht eindeutig, pro Ort) für die jeweilige Hitzewelle hinzu
     #zählt bei jedem Beginn einer neuen Hitzewelle hoch
   group_by(Ort.ID, hw_id) |>  #gruppiert die Hitzewellen und fasst sie zusammen
   reframe('Beginn' = min(Datum), 
@@ -202,22 +200,23 @@ heat.waves <- day.max.analysis |>
           'Ort.ID' = Ort.ID) |>
   unique()
 
-#<- mittl. Intensität (siehe Projektbeschr.)
+#<- mittl. Intensität (siehe Projektbeschr.) in °C
 intensity.m <- day.max.analysis |> 
   filter(Hitzewelle) |> #Tage innerhalb Hitzewelle
   mutate('hw_id' = cumsum(Beginn.Hw),
          'Monat' = month(Datum),
          'Tag' = day(Datum)) |>
-  left_join(ref.mean |> select(Ort.ID, Monat, Tag, Durchschnitt),
-            by = join_by(Ort.ID, Monat, Tag)) |> #Mittelwerte von referenzzeitraum zuordnen
+  left_join(ref.mean |> 
+              select(Ort.ID, Monat, Tag, Durchschnitt),
+            by = join_by(Ort.ID, Monat, Tag)) |> #Mittelwerte von RZR zuordnen
   group_by(Ort.ID, hw_id) |> #für jede Hitzewelle
   summarise('Beginn' = min(Datum),
             'Ende' = max(Datum),
             'Dauer' = n(),
             'Intensität.m' = mean(Celsius.max - Durchschnitt, na.rm = TRUE)) |> 
-  ungroup() #gruppierung aufheben
+  ungroup() #Gruppierung aufheben
 
-#<- kum. Intensität
+#<- kum. Intensität in °C*Tage
 intensity.c <- tibble()
 
 for (j in seq(1981, 2025)) { #für jedes Jahr
@@ -227,7 +226,8 @@ for (j in seq(1981, 2025)) { #für jedes Jahr
            Datum < ymd(paste0(j + 1, "-01-01"))) |> #Hitzewellentage des Jahres
     mutate('Monat' = month(Datum),
            'Tag' = day(Datum)) |>
-    left_join(ref.mean |> select(Ort.ID, Monat, Tag, Durchschnitt),
+    left_join(ref.mean |> 
+                select(Ort.ID, Monat, Tag, Durchschnitt),
               by = join_by(Ort.ID, Monat, Tag)) |> #Referenzmittelwerte zuordnen
     group_by(Ort.ID) |> #für jede Station
     summarise('Jahr' = j,
@@ -236,3 +236,7 @@ for (j in seq(1981, 2025)) { #für jedes Jahr
   
   intensity.c <- bind_rows(intensity.c, temp.df)
 }  
+
+i.test <- intensity.m |>
+  group_by(Ort.ID, 'Jahr' = year(Beginn + floor(as.integer(days(Ende-Beginn))/172800))) |>
+  summarise('Intensität.k' = sum(Dauer * Intensität.m))
