@@ -237,6 +237,7 @@ for (j in seq(1981, 2025)) { #für jedes Jahr
   intensity.c <- bind_rows(intensity.c, temp.df)
 }  
 
-i.test <- intensity.m |>
-  group_by(Ort.ID, 'Jahr' = year(Beginn + floor(as.integer(days(Ende-Beginn))/172800))) |>
+intensity.c <- intensity.m |>
+  #Mitte der Hitzewelle für Jahreszuordnung
+  group_by(Ort.ID, 'Jahr' = year(Beginn + floor(as.integer(days(Ende-Beginn))/172800))) |> 
   summarise('Intensität.k' = sum(Dauer * Intensität.m))
