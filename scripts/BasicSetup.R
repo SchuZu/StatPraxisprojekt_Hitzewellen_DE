@@ -12,7 +12,7 @@ library(ggplot2)
 
 
 #import data
-#raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
+raw.data <- read_csv("data/raw/data_OBS_DEU_PT1H_T2M.csv")
 
 
 SDO_IDs <- raw.data$SDO_ID |> unique() |> sort()
