@@ -42,3 +42,13 @@ day.max.analysis |>
   summarise('Hitzewellen' = sum(Beginn.Hw, na.rm = TRUE)) |>
   ggplot(aes(as.factor((Jahr %/% 10) * 10), Hitzewellen)) + labs(x = "Jahrzehnt") +
   geom_boxplot()
+
+#Dauer vs. Intensität von Hitzewellen, deutscher Mittelwert
+heat.waves |>
+  filter(Ort.ID == 9999) |>
+  ggplot(aes(Dauer, Intensität.m)) + 
+  geom_bin_2d(binwidth = c(1, 1/3)) +
+  scale_fill_gradient(low = "#9999BB", high = "#111166") +
+  geom_smooth(method = "loess", #ich messe dieser Linie wenig Aussagekraft bei
+              se = FALSE, 
+              color = "red")
