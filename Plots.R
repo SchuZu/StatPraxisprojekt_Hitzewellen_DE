@@ -65,8 +65,6 @@ intensity.c |>
   filter(Ort.ID == 9999) |>
   ggplot(aes(Jahr, Intensität.k)) + geom_line()
 
-
-
 #Dauer vs. Intensität von Hitzewellen, nur die stationen
 heat.waves |>
   filter(Ort.ID != 9999) |>
@@ -76,7 +74,6 @@ heat.waves |>
   geom_smooth(method = "loess", 
               se = FALSE, 
               color = "red")
-
 
 #f2 dauer
 heat.waves |>
@@ -114,11 +111,9 @@ intensity.c |>
   ungroup() |>
   ggplot(aes(Jahr, Intensität.k)) +
   geom_line() +
-  geom_smooth(
-    method = "lm",
-    se = FALSE,
-    color = "red"
-  )
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "red")
 
 #f3 
 heat.waves |>
@@ -128,42 +123,26 @@ heat.waves |>
   ungroup() |>
   ggplot(aes(Jahr, Hitzewellen)) +
   geom_line() +
-  geom_smooth(
-    method = "lm",
-    se = FALSE,
-    color = "red"
-  ) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "red") +
   facet_wrap(~ Ort.ID, ncol = 4)
-
-
-
-
-
-
-
 
 dates <- ymd(c(
   "2026-01-15",
   "2026-05-04",
   "2026-07-15",
   "2026-09-23",
-  "2026-12-31"
-))
+  "2026-12-31"))
 
 quarter(dates, fiscal_start = 12)
-
 quarter(dates, type = "year.quarter", fiscal_start = 12)
 
-
 heat.waves <- heat.waves |>
-  mutate(
-    Saison = factor(
-      quarter(Beginn, fiscal_start = 12),
-      levels = 1:4,
-      labels = c("Winter", "Frühling", "Sommer", "Herbst")
-    ),
-    Saison.Jahr = year(Beginn) + (month(Beginn) == 12)
-  )
+  mutate(Saison = factor(quarter(Beginn, fiscal_start = 12),
+                         levels = 1:4,
+                         labels = c("Winter", "Frühling", "Sommer", "Herbst")),
+         Saison.Jahr = year(Beginn) + (month(Beginn) == 12))
 
 heat.waves |>
   filter(Ort.ID != 9999,
@@ -174,3 +153,4 @@ heat.waves |>
   geom_line() +
   geom_smooth(method = "lm", se = FALSE, color = "red") +
   facet_wrap(~ Saison, ncol = 2) 
+
