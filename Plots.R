@@ -52,3 +52,15 @@ heat.waves |>
   geom_smooth(method = "loess", #ich messe dieser Linie wenig Aussagekraft bei
               se = FALSE, 
               color = "red")
+
+#mittlere Intensität von Hitzewellen pro Jahr, deutscher Durchschnitt
+heat.waves |>
+  filter(Ort.ID == 9999, year(Beginn) != 2026) |>
+  group_by('Jahr' = year(Beginn)) |>
+  summarise('m.Intensität' = sum(Intensität.m)) |>
+  ggplot(aes(Jahr, m.Intensität)) + geom_line()
+
+#kumulierte Intensität von Hitzewellen pro Jahr, deutscher Durchschnitt
+intensity.c |>
+  filter(Ort.ID == 9999) |>
+  ggplot(aes(Jahr, Intensität.k)) + geom_line()
