@@ -153,3 +153,24 @@ heat.waves |>
   geom_line() +
   geom_smooth(method = "lm", se = FALSE, color = "red") +
   facet_wrap(~ Saison, ncol = 2) 
+
+# Deutschlandkarte mit Messstationen plotten 
+#https://cran.r-project.org/web/packages/DEplotting/DEplotting.pdf
+#https://codeberg.org/BBEdata/DEplotting
+library(DEplotting)
+download_geo(2022, 2022)
+messstationen.orte <- data.frame(
+                        Gemeinde = c("Berlin", "Braunlage", "Bremen", "Essen", 
+                        "Freiburg im Breisgau","Freudenstadt", "Gardelegen", 
+                        "Garmisch-Partenkirchen", "Leipzig", 
+                        "Tauche", #Lindenberg ist Ortsteil der Gemeinde Tauche
+                        "List auf Sylt", "Regensburg", "Rostock", "Trier", 
+                        "Würzburg", "Mannheim"),
+                        AGS = c("11000000", "03153016", "04011000", "05113000", "08311000", "08237028", "15081135", "09180117", "14713000", "12067493", "01054078", "09362000", "13003000", "07211000", "09663000", "08222000"),
+                        daten = 1)
+
+map_plot(data = messstationen.orte, map_section = "DE", level = "kreis", 
+         var = "daten", year = 2022, geo_year = "", add_labels = FALSE, palette = "Yellow")
+map_plot(data = messstationen.orte, map_section = "DE", level = "gemeinde", 
+         var = "daten", year = 2022, geo_year = "", add_labels = FALSE, palette = "Yellow")
+
