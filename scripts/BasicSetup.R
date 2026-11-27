@@ -2,13 +2,12 @@
 # install.packages("readr")
 # install.packages("dplyr")
 # install.packages("lubridate")
+# install.packages("ggplot2")
 
 library(readr)
 library(dplyr)
 library(lubridate)
 library(ggplot2)
-
-#Zeile 1 bis 8 mit pacman-package machen...
 
 
 #import data
